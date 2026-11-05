@@ -1,0 +1,122 @@
+name: boardscout
+
+services:
+  nginx:
+    build:
+      context: ./nginx
+    container_name: boardscout-nginx
+    depends_on:
+      frontend:
+        condition: service_healthy
+      spring:
+        condition: service_healthy
+      fastapi:
+        condition: service_healthy
+    ports:
+      - "80:80"
+    networks:
+      - edge
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../frontend
+    container_name: boardscout-frontend
+    expose:
+      - "4173"
+    networks:
+      - edge
+    restart: unless-stopped
+
+  spring:
+    build:
+      context: ../spring-server
+    container_name: boardscout-spring
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      SERVER_PORT: "8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8080"
+    networks:
+      - edge
+      - data
+    restart: unless-stopped
+
+  fastapi:
+    build:
+      context: ../fastapi-server
+    container_name: boardscout-fastapi
+    environment:
+      APP_ENV: container
+      CORE_SERVICE_URL: http://spring:8080
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      MODEL_PATH: /app/models/recommendation-v1.joblib
+    depends_on:
+      redis:
+        condition: service_healthy
+      spring:
+        condition: service_healthy
+    expose:
+      - "8000"
+    networks:
+      - edge
+      - data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: boardscout-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - redis-data:/data
+    networks:
+      - data
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.4
+    container_name: boardscout-mysql
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: Asia/Seoul
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping --host=127.0.0.1 --user=root --password=$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - data
+    restart: unless-stopped
+
+networks:
+  edge:
+  data:
+    internal: true
+
+volumes:
+  mysql-data:
+  redis-data:
+
