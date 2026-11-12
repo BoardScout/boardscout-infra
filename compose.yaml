@@ -33,6 +33,7 @@ services:
       context: ../spring-server
     container_name: boardscout-spring
     environment:
+      SPRING_PROFILES_ACTIVE: dev
       MYSQL_HOST: mysql
       MYSQL_PORT: "3306"
       MYSQL_DATABASE: ${MYSQL_DATABASE}
