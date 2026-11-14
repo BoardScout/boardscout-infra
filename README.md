@@ -18,7 +18,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-접속 주소는 `http://localhost`입니다. Nginx는 `/api/core/*`를 Spring으로, `/api/recommend/*`를 FastAPI로 전달하고 나머지 요청을 Frontend로 전달합니다.
+접속 주소는 `http://localhost`입니다. Nginx는 `/api/v1/*`를 Spring으로, `/api/recommend/*`를 FastAPI로 전달하고 나머지 요청을 Frontend로 전달합니다.
 
 ## 추천 기능만 빠르게 테스트
 
