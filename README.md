@@ -18,7 +18,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-접속 주소는 `http://localhost`입니다. 프록시는 `/api/v1/*`를 핵심 서버 2대에 번갈아(round-robin) 전달하고, `/api/recommend/*`를 추천 서버로, 나머지 요청을 web으로 전달합니다. 응답 헤더 `X-Upstream`에서 요청을 처리한 서버 주소를 확인할 수 있습니다.
+접속 주소는 `http://localhost`입니다. 프록시는 `/api/v1/recommendations/*`를 추천 서버로, 그 밖의 `/api/v1/*`를 핵심 서버 2대에 번갈아(round-robin) 전달하고, 나머지 요청을 web으로 전달합니다. 응답 헤더 `X-Upstream`에서 요청을 처리한 서버 주소를 확인할 수 있습니다.
 
 ## 추천 기능만 빠르게 테스트
 
@@ -32,11 +32,11 @@ docker compose -f compose.recommend.yaml up --build
 API 연결만 확인하려면 다음 주소를 사용합니다.
 
 ```bash
-curl http://localhost:8088/api/recommend/health
+curl http://localhost:8088/api/v1/recommendations/health
 
-curl -X POST 'http://localhost:8088/api/recommend/games?limit=5' \
+curl -X POST 'http://localhost:8088/api/v1/recommendations/games?limit=5' \
   -H 'Content-Type: application/json' \
-  -d '{"recommendationMode":"taste","likedGameIds":[0,1,2]}'
+  -d '{"recommendationMode":"taste"}'
 ```
 
 테스트를 마치면 컨테이너를 종료합니다.
