@@ -1,84 +1,107 @@
 name: boardscout
 
+# 서비스 이름은 Docker 내부 DNS 이름이다. nginx/default.conf 와 환경 변수가 같은 이름을 사용한다.
+x-core: &core
+  build:
+    context: ../spring-server
+  environment:
+    SPRING_PROFILES_ACTIVE: dev
+    MYSQL_HOST: db
+    MYSQL_PORT: "3306"
+    MYSQL_DATABASE: ${MYSQL_DATABASE}
+    MYSQL_USER: ${MYSQL_USER}
+    MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    REDIS_HOST: session
+    REDIS_PORT: "6379"
+    SERVER_PORT: "8080"
+  depends_on:
+    db:
+      condition: service_healthy
+    session:
+      condition: service_healthy
+  expose:
+    - "8080"
+  restart: unless-stopped
+
 services:
-  nginx:
+  proxy:
     build:
       context: ./nginx
-    container_name: boardscout-nginx
+    container_name: boardscout-proxy
     depends_on:
-      frontend:
+      web:
         condition: service_healthy
-      spring:
+      core-1:
         condition: service_healthy
-      fastapi:
+      core-2:
+        condition: service_healthy
+      recommender:
         condition: service_healthy
     ports:
       - "80:80"
     networks:
-      - edge
+      - public-net
     restart: unless-stopped
 
-  frontend:
+  web:
     build:
       context: ../frontend
-    container_name: boardscout-frontend
+    container_name: boardscout-web
     expose:
       - "4173"
     networks:
-      - edge
+      - public-net
     restart: unless-stopped
 
-  spring:
-    build:
-      context: ../spring-server
-    container_name: boardscout-spring
-    environment:
-      SPRING_PROFILES_ACTIVE: dev
-      MYSQL_HOST: mysql
-      MYSQL_PORT: "3306"
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      REDIS_HOST: redis
-      REDIS_PORT: "6379"
-      SERVER_PORT: "8080"
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    expose:
-      - "8080"
+  core-1:
+    <<: *core
+    container_name: boardscout-core-1
     networks:
-      - edge
-      - data
-    restart: unless-stopped
+      public-net:
+      private-net:
+        aliases: [core]
 
-  fastapi:
+  core-2:
+    <<: *core
+    container_name: boardscout-core-2
+    # Flyway 마이그레이션이 동시에 실행되지 않도록 core-1 이 정상 기동한 뒤에 시작한다.
+    depends_on:
+      db:
+        condition: service_healthy
+      session:
+        condition: service_healthy
+      core-1:
+        condition: service_healthy
+    networks:
+      public-net:
+      private-net:
+        aliases: [core]
+
+  recommender:
     build:
       context: ../fastapi-server
-    container_name: boardscout-fastapi
+    container_name: boardscout-recommender
     environment:
       APP_ENV: container
-      CORE_SERVICE_URL: http://spring:8080
-      REDIS_HOST: redis
+      CORE_SERVICE_URL: http://core:8080
+      REDIS_HOST: session
       REDIS_PORT: "6379"
       MODEL_PATH: /app/models/recommendation-v1.joblib
     depends_on:
-      redis:
+      session:
         condition: service_healthy
-      spring:
+      core-1:
         condition: service_healthy
     expose:
       - "8000"
     networks:
-      - edge
-      - data
+      - public-net
+      - private-net
     restart: unless-stopped
 
-  redis:
+  session:
     image: redis:7.4-alpine
-    container_name: boardscout-redis
+    container_name: boardscout-session
     command: ["redis-server", "--appendonly", "yes"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -86,14 +109,14 @@ services:
       timeout: 3s
       retries: 10
     volumes:
-      - redis-data:/data
+      - session-data:/data
     networks:
-      - data
+      - private-net
     restart: unless-stopped
 
-  mysql:
+  db:
     image: mysql:8.4
-    container_name: boardscout-mysql
+    container_name: boardscout-db
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
@@ -107,17 +130,17 @@ services:
       retries: 20
       start_period: 20s
     volumes:
-      - mysql-data:/var/lib/mysql
+      - db-data:/var/lib/mysql
     networks:
-      - data
+      - private-net
     restart: unless-stopped
 
 networks:
-  edge:
-  data:
+  public-net:
+  private-net:
     internal: true
 
 volumes:
-  mysql-data:
-  redis-data:
+  db-data:
+  session-data:
 

@@ -7,3 +7,5 @@ proxy_connect_timeout 5s;
 proxy_read_timeout 60s;
 proxy_send_timeout 60s;
 
+# 실제로 요청을 처리한 서버 주소를 응답 헤더로 알려 준다(분산 검증용).
+add_header X-Upstream $upstream_addr always;

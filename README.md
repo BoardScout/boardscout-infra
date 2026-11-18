@@ -1,15 +1,15 @@
 # BoardScout Infrastructure
 
-BoardScout의 6개 컨테이너를 Docker Compose로 실행합니다.
+BoardScout의 7개 컨테이너를 Docker Compose로 실행합니다. 과제 제출용 `docker run` 절차는 보고서에 정리되어 있습니다.
 
 | 컨테이너 | 역할 | 외부 공개 |
 | --- | --- | --- |
-| `nginx` | 단일 진입점과 리버스 프록시 | `80` |
-| `frontend` | 정적 HTML/CSS/JS 제공 | 없음 |
-| `spring` | 핵심 API | 없음 |
-| `fastapi` | 추천 API | 없음 |
-| `redis` | 캐시 | 없음 |
-| `mysql` | 영구 데이터베이스 | 없음 |
+| `boardscout-proxy` | 단일 진입점과 역방향 프록시(Nginx) | `80` |
+| `boardscout-web` | 정적 HTML/CSS/JS 제공 | 없음 |
+| `boardscout-core-1`, `boardscout-core-2` | 핵심 서버(Spring Boot) 2대, 회원·인증·카탈로그·별점 | 없음 |
+| `boardscout-recommender` | 추천 서버(FastAPI) | 없음 |
+| `boardscout-session` | 서버 간 공유 세션 저장소(Redis) | 없음 |
+| `boardscout-db` | 영구 데이터베이스(MySQL) | 없음 |
 
 ## 실행
 
@@ -18,7 +18,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-접속 주소는 `http://localhost`입니다. Nginx는 `/api/v1/*`를 Spring으로, `/api/recommend/*`를 FastAPI로 전달하고 나머지 요청을 Frontend로 전달합니다.
+접속 주소는 `http://localhost`입니다. 프록시는 `/api/v1/*`를 핵심 서버 2대에 번갈아(round-robin) 전달하고, `/api/recommend/*`를 추천 서버로, 나머지 요청을 web으로 전달합니다. 응답 헤더 `X-Upstream`에서 요청을 처리한 서버 주소를 확인할 수 있습니다.
 
 ## 추천 기능만 빠르게 테스트
 
